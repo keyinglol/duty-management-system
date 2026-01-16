@@ -346,7 +346,6 @@ button:disabled { background: #cbd5e1; cursor: not-allowed; }
   animation: shake 0.4s ease-in-out;
 }
 
-/* Optional: Shake animation to draw attention */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-4px); }
