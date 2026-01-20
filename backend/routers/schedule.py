@@ -6,8 +6,10 @@ from services.schedule_service import (
     list_schedules,
     delete_schedule,
     update_schedule,
-    auto_schedule,
     export_schedule
+)
+from services.auto_scheduler_logic import (
+    auto_schedule_logic
 )
 from fastapi.responses import FileResponse
 from datetime import date
@@ -42,8 +44,18 @@ def update_schedule_endpoint(schedule_id: int, schedule: ScheduleCreate, db: Ses
     raise HTTPException(status_code=404, detail="Schedule not found")
 
 @router.post("/auto")
-def auto_schedule_endpoint(start_date: date, end_date: date, db: Session = Depends(get_db)):
-    return auto_schedule(db, start_date, end_date)
+def auto_schedule_endpoint(
+    start_date: date, 
+    end_date: date, 
+    db: Session = Depends(get_db)
+):
+    # The router manages the "Inlet" and "Outlet"
+    try:
+        result = auto_schedule_logic(db, start_date, end_date)
+        return result
+    except Exception as e:
+        # If something goes wrong, the session can be rolled back here or by the dependency
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/export")
 def export_schedule_endpoint(db: Session = Depends(get_db)):

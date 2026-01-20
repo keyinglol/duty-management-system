@@ -174,23 +174,25 @@ export default {
         this.showDropdown = false;
       }, 200);
     },
-    async autoSchedule() {
-      if (!this.start_date || !this.end_date) return;
-      try {
-        await api.post("/schedule/auto", {
-          start_date: this.start_date,
-          end_date: this.end_date,
-        });
-        
-        // Reset Form
-        this.start_date = "";
-        this.end_date = "";
-        
-        this.$emit("refresh-schedule");
-      } catch (err) {
-        console.error("Auto-schedule failed:", err);
-      }
-    },
+async autoSchedule() {
+  if (!this.start_date || !this.end_date) return;
+  try {
+    // Note: The second argument is the data body (null), 
+    // the third argument is the config (params)
+    await api.post("/schedule/auto", null, {
+      params: {
+        start_date: this.start_date,
+        end_date: this.end_date,
+      },
+    });
+    
+    this.start_date = "";
+    this.end_date = "";
+    this.$emit("refresh-schedule");
+  } catch (err) {
+    console.error("Auto-schedule failed:", err);
+  }
+}
   },
 };
 </script>

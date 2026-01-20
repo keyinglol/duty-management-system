@@ -5,16 +5,12 @@
         <h1>System Overview</h1>
         <p class="text-muted">{{ todayDate }}</p>
       </div>
-      <!-- <div class="header-actions">
-        <button class="btn-outline" @click="exportReport">Export Monthly Report</button>
-        
-      </div> -->
       <div class="header-actions">
         <button class="btn-primary" @click="exportReport">
-            Export Monthly Report
+          Export Monthly Report
         </button>
-    </div>
-</header>
+      </div>
+    </header>
 
     <div class="stats-grid">
       <div class="stat-card">
@@ -23,14 +19,12 @@
           <span class="value">{{ stats.total_staff }}</span>
         </div>
       </div>
-      
       <div class="stat-card">
         <div class="stat-info">
           <span class="label">Today's Assignments</span>
           <span class="value">{{ stats.today_shifts_count }}</span>
         </div>
       </div>
-
       <div class="stat-card">
         <div class="stat-info">
           <span class="label">Unfilled Shift Gaps</span>
@@ -43,23 +37,37 @@
 
     <div class="dashboard-grid">
       <div class="left-column">
-        <div class="card mb-4">
-          <div class="card-header border-bottom">
-            <h3>Personnel Utilization</h3>
-            <span class="subtitle">Ranking by shift frequency</span>
+        <div class="card utilization-card">
+          <div class="card-header border-bottom d-flex justify-between align-center">
+            <div>
+              <h3>Personnel Utilization</h3>
+              <span class="subtitle">Ranking for {{ stats.active_month_name }}</span>
+            </div>
+            <input 
+              type="month" 
+              v-model="selectedMonth" 
+              @change="fetchData" 
+              class="month-picker"
+            />
           </div>
-          <div class="workload-list">
-            <div v-for="(item, index) in stats.ranked_staff" :key="item.id" class="workload-row">
-              <span class="rank-index">{{ index + 1 }}</span>
-              <div class="staff-meta">
-                <span class="staff-name">{{ item.name }}</span>
-                <span class="staff-position">{{ item.position }}</span>
-              </div>
-              <div class="bar-container">
-                <div class="progress-track">
-                  <div class="progress-fill" :style="{ width: (item.count / maxShifts) * 100 + '%' }"></div>
+
+          <div class="scrollable-container">
+            <div class="workload-list">
+              <div v-for="(item, index) in stats.ranked_staff" :key="item.id" class="workload-row">
+                <span class="rank-index">{{ index + 1 }}</span>
+                <div class="staff-meta">
+                  <span class="staff-name">{{ item.name }}</span>
+                  <span class="staff-position">{{ item.position }}</span>
                 </div>
-                <span class="count-value">{{ item.count }}</span>
+                <div class="bar-container">
+                  <div class="progress-track">
+                    <div class="progress-fill" :style="{ width: (item.count / maxShifts) * 100 + '%' }"></div>
+                  </div>
+                  <span class="count-value">{{ item.count }}</span>
+                </div>
+              </div>
+              <div v-if="stats.ranked_staff.length === 0" class="empty-state">
+                No data for this period
               </div>
             </div>
           </div>
@@ -103,6 +111,7 @@ export default {
   data() {
     return {
       // Initialize stats with empty values to avoid template errors before loading
+      selectedMonth: new Date().toISOString().slice(0, 7),
       stats: {
         total_staff: 0,
         today_shifts_count: 0,
@@ -115,34 +124,58 @@ export default {
   },
   computed: {
     // We still calculate maxShifts locally to ensure the bar graph is relative
+    // maxShifts() {
+    //   if (!this.stats.ranked_staff || this.stats.ranked_staff.length === 0) return 1;
+    //   return Math.max(...this.stats.ranked_staff.map(s => s.count), 1);
+    // }
     maxShifts() {
-      if (!this.stats.ranked_staff || this.stats.ranked_staff.length === 0) return 1;
-      return Math.max(...this.stats.ranked_staff.map(s => s.count), 1);
+    // If everyone is at 0, default to 1 to avoid division by zero
+    const counts = this.stats.ranked_staff.map(s => s.count);
+    const max = Math.max(...counts, 0);
+    return max === 0 ? 1 : max;
     }
   },
   async mounted() {
     await this.fetchData();
   },
   methods: {
+    // async fetchData() {
+    //   const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    //   try {
+    //     // Fetch from the new statistics API and the existing schedule API
+    //     const [statsRes, scheduleRes] = await Promise.all([
+    //       api.get("/statistics/summary"),
+    //       api.get("/schedule/")
+    //     ]);
+        
+    //     this.stats = statsRes.data;
+        
+    //     // Still filter today's shifts locally to show the names in the right column
+    //     // (Or create an endpoint like /schedule/today if todayShifts is very large)
+    //     this.todayShifts = scheduleRes.data.filter(s => s.duty_date === today);
+        
+    //   } catch (e) {
+    //     console.error("Error loading dashboard data:", e);
+    //   }
+    // },
+
     async fetchData() {
-      const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
-      try {
-        // Fetch from the new statistics API and the existing schedule API
-        const [statsRes, scheduleRes] = await Promise.all([
-          api.get("/statistics/summary"),
-          api.get("/schedule/")
-        ]);
-        
-        this.stats = statsRes.data;
-        
-        // Still filter today's shifts locally to show the names in the right column
-        // (Or create an endpoint like /schedule/today if todayShifts is very large)
-        this.todayShifts = scheduleRes.data.filter(s => s.duty_date === today);
-        
-      } catch (e) {
-        console.error("Error loading dashboard data:", e);
-      }
-    },
+    const [year, month] = this.selectedMonth.split("-");
+    const today = new Date().toLocaleDateString('en-CA');
+
+    try {
+      const [statsRes, scheduleRes] = await Promise.all([
+        // Pass year and month as query parameters
+        api.get(`/statistics/summary?target_year=${year}&target_month=${month}`),
+        api.get("/schedule/")
+      ]);
+      
+      this.stats = statsRes.data;
+      this.todayShifts = scheduleRes.data.filter(s => s.duty_date === today);
+    } catch (e) {
+      console.error("Error loading dashboard data:", e);
+    }
+  },
     exportReport() {
       // Points to your FastAPI export endpoint
       window.open("http://localhost:8000/schedule/export", "_blank");
@@ -215,4 +248,45 @@ export default {
 .nav-btn { text-align: left; padding: 10px 12px; border: 1px solid #e2e8f0; background: white; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 500; }
 .nav-btn:hover { border-color: #94a3b8; background: #f8fafc; }
 .empty-state { padding: 1rem; text-align: center; color: #94a3b8; font-size: 0.9rem; }
+.scrollable-container {
+  max-height: 450px; /* Adjust this height as needed */
+  overflow-y: auto;
+  scrollbar-width: thin; /* For Firefox */
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+/* Optional: Custom scrollbar styling for Chrome/Safari/Edge */
+.scrollable-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollable-container::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+.scrollable-container::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 10px;
+}
+
+/* Ensure rows don't look squashed */
+.workload-list {
+  padding: 0 1.5rem; /* Removed vertical padding so it aligns with header */
+}
+.d-flex { display: flex; }
+.justify-between { justify-content: space-between; }
+.align-center { align-items: center; }
+
+.month-picker {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  font-size: 0.85rem;
+  color: #475569;
+  outline: none;
+}
+
+.month-picker:focus {
+  border-color: #94a3b8;
+}
 </style>
